@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>前后端分离计算器前端</title>
+<style>
+    .item{margin:8px 0;}
+    .del-btn{margin-left:10px;color:red;cursor:pointer;}
+</style>
+</head>
+<body>
+    <h2>计算器</h2>
+    <input id="expr" placeholder="输入表达式，如(1+2)*3" style="width:300px;">
+    <button onclick="calc()">计算</button>
+    <div id="result" style="margin:10px 0;"></div>
+    <hr>
+    <h3>计算历史记录</h3>
+    <button onclick="loadHistory()">刷新历史</button>
+    <div id="historyList"></div>
+
+    <script>
+        const baseUrl = "http://localhost:8080/api";
+
+        // 提交计算请求
+        async function calc(){
+            const expr = document.getElementById("expr").value.trim();
+            const resEl = document.getElementById("result");
+            try{
+                const resp = await fetch(baseUrl + "/calculate",{
+                    method:"POST",
+                    headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({expression:expr})
+                });
+                const data = await resp.json();
+                console.log("计算返回：",data);
+                if(data.success){
+                    resEl.innerText = `✅ 表达式：${data.expression}，结果：${data.result}`;
+                }else{
+                    resEl.innerText = `❌ 错误：${data.message}`;
+                }
+                // 计算完成后加载历史
+                await loadHistory();
+            }catch(err){
+                resEl.innerText = "后端服务连接失败，请检查后端是否启动";
+                console.error("calc报错：",err);
+            }
+        }
+
+        // 加载历史
+        async function loadHistory(){
+            const histEl = document.getElementById("historyList");
+            try{
+                const resp = await fetch(baseUrl + "/history");
+                const list = await resp.json();
+                console.log("拿到历史列表：",list);
+                let html = "";
+                for(let item of list){
+                    html += `<div class="item">
+                        id:${item.id} | ${item.expression} = ${item.result} | ${item.createdAt??"无时间"}
+                        <button class="del-btn" onclick="delRecord(${item.id})">删除</button>
+                    </div>`;
+                }
+                histEl.innerHTML = html;
+            }catch(err){
+                histEl.innerText = "读取历史失败，后端未启动";
+                console.error("loadHistory报错：",err);
+            }
+        }
+
+        // 删除单条记录
+        async function delRecord(id){
+            try{
+                await fetch(baseUrl + "/history/"+id, {method:"DELETE"});
+                await loadHistory();
+            }catch(err){
+                alert("删除失败");
+                console.error("delRecord报错：",err);
+            }
+        }
+
+        // 页面打开自动加载历史
+        loadHistory();
+    </script>
+</body>
+</html>
